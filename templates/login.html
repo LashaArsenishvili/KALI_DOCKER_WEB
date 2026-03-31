@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kali Docker Manager — Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-app:       #1a1a1a;
+  --bg-card:      #252525;
+  --bg-input:     #1e1e1e;
+  --border:       #333333;
+  --border-focus: #4caf50;
+  --accent:       #4caf50;
+  --accent-hover: #66bb6a;
+  --red:          #f44336;
+  --text-1:       #e0e0e0;
+  --text-2:       #9e9e9e;
+  --text-3:       #616161;
+  --font-ui:      'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --radius:       6px;
+  --shadow-lg:    0 8px 32px rgba(0,0,0,.7);
+}
+html, body {
+  height: 100%;
+  background: var(--bg-app);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-wrap {
+  width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 36px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-icon {
+  width: 48px; height: 48px;
+  background: #1a2e1a;
+  border: 1px solid #2e6b31;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+
+.login-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: .3px;
+}
+
+.login-subtitle {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.field input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.field input:focus {
+  border-color: var(--border-focus);
+}
+
+.error-box {
+  background: rgba(244,67,54,.1);
+  border: 1px solid rgba(244,67,54,.35);
+  border-radius: var(--radius);
+  color: var(--red);
+  font-size: 12px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.btn-login {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px;
+  transition: background .15s;
+  width: 100%;
+  letter-spacing: .3px;
+}
+
+.btn-login:hover { background: var(--accent-hover); }
+
+.login-footer {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-header">
+    <div class="login-icon">🐉</div>
+    <div class="login-title">Kali Docker Manager</div>
+    <div class="login-subtitle">Secure Access Required</div>
+  </div>
+
+  {% if error %}
+  <div class="error-box">
+    <span>⚠</span> {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/login">
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="administrator" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login">Sign In →</button>
+    </div>
+  </form>
+
+  <div class="login-footer">kali-docker-manager · protected</div>
+</div>
+</body>
+</html>

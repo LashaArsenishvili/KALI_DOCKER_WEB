@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kali Docker Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-app:       #1a1a1a;
+  --bg-sidebar:   #222222;
+  --bg-toolbar:   #2a2a2a;
+  --bg-card:      #252525;
+  --bg-card-sel:  #2d3a2d;
+  --bg-input:     #1e1e1e;
+  --bg-modal:     #1f1f1f;
+  --bg-panel:     #202020;
+  --border:       #333333;
+  --border-focus: #4caf50;
+  --accent:       #4caf50;
+  --accent-dim:   #2e6b31;
+  --accent-hover: #66bb6a;
+  --red:          #f44336;
+  --red-dim:      #7a1c17;
+  --yellow:       #ffc107;
+  --blue:         #42a5f5;
+  --cyan:         #26c6da;
+  --text-1:       #e0e0e0;
+  --text-2:       #9e9e9e;
+  --text-3:       #616161;
+  --font-ui:      'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --radius-sm:    4px;
+  --radius:       6px;
+  --radius-lg:    10px;
+  --shadow:       0 2px 12px rgba(0,0,0,.5);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,.7);
+}
+html, body { height: 100%; background: var(--bg-app); color: var(--text-1); font-family: var(--font-ui); font-size: 13px; overflow: hidden; }
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+#root { display: flex; flex-direction: column; height: 100vh; }
+
+/* Menubar */
+#menubar {
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 2px; padding: 0 8px;
+  height: 28px; flex-shrink: 0; user-select: none;
+}
+.menu-item {
+  padding: 2px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--text-1); font-size: 12px; transition: background .15s;
+}
+.menu-item:hover { background: rgba(255,255,255,.08); }
+#menubar .logo {
+  display: flex; align-items: center; gap: 6px; margin-right: 12px;
+  color: var(--accent); font-weight: 700; font-size: 12px; letter-spacing: .5px;
+}
+.logo-icon { width: 16px; height: 16px; }
+
+/* Toolbar */
+#toolbar {
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px 8px; flex-shrink: 0;
+}
+.tb-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--text-2); font-size: 10px; transition: all .15s; border: none;
+  background: transparent; min-width: 60px;
+}
+.tb-btn:hover { background: rgba(255,255,255,.07); color: var(--text-1); }
+.tb-btn:active { background: rgba(255,255,255,.04); }
+.tb-btn.disabled { opacity: .35; pointer-events: none; }
+.tb-icon { font-size: 20px; line-height: 1; }
+.tb-sep { width: 1px; height: 36px; background: var(--border); margin: 0 4px; }
+
+/* Main content */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* Sidebar */
+#sidebar {
+  width: 220px; flex-shrink: 0; background: var(--bg-sidebar);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  overflow-y: auto; user-select: none;
+}
+.sidebar-header {
+  padding: 10px 12px 6px; font-size: 10px; font-weight: 600;
+  color: var(--text-3); letter-spacing: 1px; text-transform: uppercase;
+}
+.session-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; cursor: pointer; transition: background .1s;
+  border-left: 2px solid transparent;
+}
+.session-item:hover { background: rgba(255,255,255,.04); }
+.session-item.selected {
+  background: var(--bg-card-sel); border-left-color: var(--accent);
+  color: var(--text-1);
+}
+.session-item.selected .si-name { color: var(--accent); }
+.si-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.si-name { font-size: 12px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.si-port { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
+
+/* Content pane */
+#content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Session grid / welcome */
+#session-grid {
+  flex: 1; padding: 16px; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px; align-content: start;
+}
+
+/* Machine card */
+.machine-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 0; cursor: pointer;
+  transition: all .15s; position: relative; overflow: hidden;
+}
+.machine-card:hover { border-color: #555; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.machine-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+.mc-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 10px; border-bottom: 1px solid var(--border);
+}
+.mc-icon {
+  width: 36px; height: 36px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #1b3a1e, #2e6b31);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.mc-title { flex: 1; min-width: 0; }
+.mc-name { font-size: 13px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-sub { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
+.mc-status-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+  white-space: nowrap;
+}
+.mc-body { padding: 10px 14px 12px; }
+.mc-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.mc-label { color: var(--text-3); font-size: 11px; }
+.mc-val { color: var(--text-2); font-size: 11px; font-family: var(--font-mono); }
+.mc-val.link { color: var(--blue); cursor: pointer; }
+.mc-val.link:hover { text-decoration: underline; }
+
+/* Status colors */
+.status-running  { background: rgba(76,175,80,.15); color: #4caf50; }
+.status-stopped  { background: rgba(244,67,54,.15); color: #f44336; }
+.status-creating { background: rgba(255,193,7,.15); color: #ffc107; }
+.status-missing  { background: rgba(97,97,97,.2);  color: #757575; }
+.status-exited   { background: rgba(244,67,54,.15); color: #f44336; }
+.status-paused   { background: rgba(255,193,7,.15); color: #ffc107; }
+.dot-running  { background: #4caf50; }
+.dot-stopped  { background: #f44336; }
+.dot-creating { background: #ffc107; box-shadow: 0 0 6px #ffc107; animation: pulse .8s infinite; }
+.dot-missing  { background: #616161; }
+.dot-exited   { background: #f44336; }
+.dot-paused   { background: #ffc107; }
+
+/* Right panel */
+#right-panel {
+  width: 320px; flex-shrink: 0; border-left: 1px solid var(--border);
+  background: var(--bg-panel); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.rp-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.rp-tab {
+  flex: 1; padding: 8px 4px; text-align: center; font-size: 11px;
+  font-weight: 500; cursor: pointer; color: var(--text-3);
+  border-bottom: 2px solid transparent; transition: all .15s;
+}
+.rp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.rp-tab:hover:not(.active) { color: var(--text-2); }
+.rp-content { flex: 1; overflow-y: auto; padding: 12px; }
+
+/* Details panel */
+.detail-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.detail-label { width: 90px; font-size: 11px; color: var(--text-3); flex-shrink: 0; padding-top: 1px; }
+.detail-val { font-size: 11px; color: var(--text-1); font-family: var(--font-mono); word-break: break-all; }
+.detail-val.clickable { color: var(--blue); cursor: pointer; }
+.detail-val.clickable:hover { text-decoration: underline; }
+.detail-section { margin-bottom: 14px; }
+.detail-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text-3); margin-bottom: 8px; }
+
+/* Stats gauges */
+.gauge-row { margin-bottom: 10px; }
+.gauge-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.gauge-label { font-size: 11px; color: var(--text-2); }
+.gauge-val { font-size: 11px; color: var(--text-1); font-family: var(--font-mono); }
+.gauge-track { height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.gauge-cpu { background: linear-gradient(90deg, #26c6da, #4caf50); }
+.gauge-mem { background: linear-gradient(90deg, #42a5f5, #7e57c2); }
+
+/* Logs */
+#log-output {
+  background: #111; border-radius: var(--radius); padding: 10px;
+  font-family: var(--font-mono); font-size: 10.5px; color: #a5d6a7;
+  white-space: pre-wrap; word-break: break-all; height: 100%;
+  overflow-y: auto; line-height: 1.5;
+}
+
+/* Status bar */
+#statusbar {
+  background: var(--accent); display: flex; align-items: center; gap: 12px;
+  padding: 0 12px; height: 22px; flex-shrink: 0;
+}
+#statusbar.error-bar { background: var(--red); }
+.sb-item { font-size: 11px; color: rgba(0,0,0,.8); font-weight: 500; }
+.sb-sep { width: 1px; height: 12px; background: rgba(0,0,0,.2); }
+
+/* Welcome screen */
+#welcome {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  color: var(--text-3); text-align: center; padding: 24px;
+}
+.welcome-logo { font-size: 64px; opacity: .3; }
+.welcome-title { font-size: 22px; font-weight: 700; color: var(--text-2); }
+.welcome-sub { font-size: 13px; color: var(--text-3); max-width: 360px; line-height: 1.6; }
+
+/* Modals */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--bg-modal); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 24px; width: 440px;
+  box-shadow: var(--shadow-lg);
+}
+.modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--text-1); }
+.modal-title span { color: var(--accent); }
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; letter-spacing: .3px; }
+.form-input {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 10px; font-size: 12px;
+  color: var(--text-1); font-family: var(--font-mono); outline: none;
+  transition: border-color .15s;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
+.form-hint { font-size: 10px; color: var(--text-3); margin-top: 3px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.btn {
+  padding: 7px 16px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.btn-primary { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: transparent; color: var(--text-2); border-color: var(--border); }
+.btn-secondary:hover { background: rgba(255,255,255,.05); color: var(--text-1); }
+.btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+.btn-danger:hover { background: #e53935; }
+.btn-warning { background: transparent; color: var(--yellow); border-color: var(--yellow); }
+.btn-warning:hover { background: rgba(255,193,7,.1); }
+
+/* Terminal modal */
+.terminal-area {
+  background: #0d0d0d; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px; height: 220px; overflow-y: auto; font-family: var(--font-mono);
+  font-size: 11px; color: #a5d6a7; white-space: pre-wrap; margin-bottom: 10px;
+}
+.terminal-input-row { display: flex; gap: 6px; }
+.terminal-prompt { color: var(--accent); font-family: var(--font-mono); font-size: 12px; padding: 7px 0; }
+
+/* Notification toast */
+#toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  background: #323232; color: var(--text-1); padding: 10px 20px;
+  border-radius: var(--radius); font-size: 12px; z-index: 9999;
+  box-shadow: var(--shadow-lg); transition: opacity .25s;
+  min-width: 240px; text-align: center;
+}
+#toast.hidden { opacity: 0; pointer-events: none; }
+#toast.success { border-left: 3px solid var(--accent); }
+#toast.error { border-left: 3px solid var(--red); }
+
+/* Spinner */
+.spinner {
+  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block; vertical-align: middle;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* Animations */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn .2s ease; }
+
+/* Empty state */
+.empty-state { grid-column: 1/-1; text-align: center; padding: 60px 24px; color: var(--text-3); }
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .3; }
+.empty-state p { font-size: 13px; }
+
+/* Confirm dialog */
+.confirm-modal { width: 360px; }
+.confirm-msg { font-size: 13px; color: var(--text-2); margin-bottom: 20px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- Menubar -->
+  <div id="menubar">
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      KALI DOCKER MANAGER
+    </div>
+    <div class="menu-item" onclick="openCreateModal()">Machine</div>
+    <div class="menu-item" onclick="refreshSessions()">View</div>
+    <div class="menu-item">Help</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button class="tb-btn" onclick="openCreateModal()" title="Create new session">
+      <span class="tb-icon">➕</span><span>New</span>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-start" onclick="actionStart()" title="Start selected">
+      <span class="tb-icon">▶️</span><span>Start</span>
+    </button>
+    <button class="tb-btn" id="btn-stop" onclick="actionStop()" title="Stop selected">
+      <span class="tb-icon">⏹️</span><span>Stop</span>
+    </button>
+    <button class="tb-btn" id="btn-restart" onclick="actionRestart()" title="Restart selected">
+      <span class="tb-icon">🔄</span><span>Restart</span>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-connect" onclick="actionConnect()" title="Open in browser">
+      <span class="tb-icon">🖥️</span><span>Connect</span>
+    </button>
+    <button class="tb-btn" id="btn-terminal" onclick="openTerminalModal()" title="Run command">
+      <span class="tb-icon">💻</span><span>Terminal</span>
+    </button>
+    <button class="tb-btn" id="btn-passwd" onclick="openPasswordModal()" title="Change password">
+      <span class="tb-icon">🔑</span><span>Password</span>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-remove" onclick="confirmDelete()" title="Remove selected">
+      <span class="tb-icon">🗑️</span><span>Remove</span>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="openBulkModal()" title="Bulk create">
+      <span class="tb-icon">⚡</span><span>Bulk</span>
+    </button>
+    <button class="tb-btn" onclick="pullImage()" title="Pull/update Docker image">
+      <span class="tb-icon">🐳</span><span>Pull</span>
+    </button>
+    <div style="margin-left:auto; display:flex; align-items:center; gap:8px; padding-right:6px;">
+      <span id="docker-badge" style="font-size:10px; color:var(--text-3);">⬤ Checking...</span>
+      <button class="tb-btn" onclick="refreshSessions()" title="Refresh">
+        <span class="tb-icon">🔃</span><span>Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-header">Sessions</div>
+      <div id="sidebar-list"></div>
+    </div>
+
+    <!-- Content -->
+    <div id="content">
+      <div id="session-grid"></div>
+    </div>
+
+    <!-- Right panel -->
+    <div id="right-panel">
+      <div class="rp-tabs">
+        <div class="rp-tab active" onclick="switchTab('details')">Details</div>
+        <div class="rp-tab" onclick="switchTab('stats')">Stats</div>
+        <div class="rp-tab" onclick="switchTab('logs')">Logs</div>
+      </div>
+      <div class="rp-content" id="rp-details"></div>
+    </div>
+
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusbar">
+    <span class="sb-item" id="sb-docker">Docker: —</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item" id="sb-sessions">Sessions: 0</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item" id="sb-host">Host: —</span>
+    <span style="margin-left:auto" class="sb-item" id="sb-time"></span>
+  </div>
+
+</div>
+
+<!-- ══ Modals ══════════════════════════════════════════════════════════════════ -->
+
+<!-- Create Session -->
+<div class="modal-overlay hidden" id="modal-create">
+  <div class="modal fade-in">
+    <div class="modal-title">New <span>Kali Session</span></div>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input class="form-input" id="inp-username" placeholder="e.g. student01" autocomplete="off">
+      <div class="form-hint">Used as container hostname and login name</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">VNC / Login Password</label>
+      <input class="form-input" id="inp-password" placeholder="kali" type="text" autocomplete="off">
+      <div class="form-hint">Default: kali</div>
+    </div>
+    <div style="background:#1a1a1a; border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:4px;">
+      <div style="font-size:10px; color:var(--text-3); margin-bottom:6px; text-transform:uppercase; letter-spacing:.8px; font-weight:600;">Resource Limits</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11px;">
+        <div style="color:var(--text-3);">CPU Cores</div><div style="font-family:var(--font-mono); color:var(--text-2);">5</div>
+        <div style="color:var(--text-3);">RAM</div><div style="font-family:var(--font-mono); color:var(--text-2);">8 GB</div>
+        <div style="color:var(--text-3);">Swap</div><div style="font-family:var(--font-mono); color:var(--text-2);">10 GB</div>
+        <div style="color:var(--text-3);">Resolution</div><div style="font-family:var(--font-mono); color:var(--text-2);">1280×768</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create')">Cancel</button>
+      <button class="btn btn-primary" onclick="createSession()">Create Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Create -->
+<div class="modal-overlay hidden" id="modal-bulk">
+  <div class="modal fade-in">
+    <div class="modal-title">⚡ <span>Bulk Create Sessions</span></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Username Prefix</label>
+        <input class="form-input" id="inp-bulk-prefix" placeholder="student" value="student">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Count</label>
+        <input class="form-input" id="inp-bulk-count" type="number" min="1" max="50" value="5">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password (for all)</label>
+      <input class="form-input" id="inp-bulk-password" placeholder="kali" value="kali">
+    </div>
+    <div class="form-hint" style="margin-bottom:14px;">Creates: student01, student02, … student05 (example)</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-bulk')">Cancel</button>
+      <button class="btn btn-primary" onclick="bulkCreate()">Create All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Change -->
+<div class="modal-overlay hidden" id="modal-password">
+  <div class="modal fade-in">
+    <div class="modal-title">🔑 Change Password — <span id="pw-username-label">—</span></div>
+    <div class="form-group">
+      <label class="form-label">New Password</label>
+      <input class="form-input" id="inp-new-password" type="text" placeholder="Enter new password">
+      <div class="form-hint">Container restart required for browser login to take effect</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-password')">Cancel</button>
+      <button class="btn btn-warning" onclick="changePassword()">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Terminal / Exec -->
+<div class="modal-overlay hidden" id="modal-terminal">
+  <div class="modal fade-in" style="width:560px;">
+    <div class="modal-title">💻 Terminal — <span id="term-username-label">—</span></div>
+    <div class="terminal-area" id="terminal-output">~ Ready. Type a command below.\n</div>
+    <div class="terminal-input-row">
+      <span class="terminal-prompt">$</span>
+      <input class="form-input" id="inp-terminal-cmd" placeholder="bash command..." style="flex:1;">
+      <button class="btn btn-primary" onclick="execCommand()" style="white-space:nowrap;">Run</button>
+    </div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-terminal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal confirm-modal fade-in">
+    <div class="modal-title">🗑️ Remove Session</div>
+    <div class="confirm-msg" id="confirm-msg">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">Cancel</button>
+      <button class="btn btn-danger" onclick="deleteSession()">Remove Permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let sessions = [];
+let selectedSession = null;
+let currentTab = 'details';
+let statsInterval = null;
+let logsInterval = null;
+let refreshInterval = null;
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  refreshSessions();
+  checkDockerStatus();
+  refreshInterval = setInterval(refreshSessions, 8000);
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Enter to submit in modals
+  document.getElementById('inp-username').addEventListener('keydown', e => e.key === 'Enter' && createSession());
+  document.getElementById('inp-terminal-cmd').addEventListener('keydown', e => e.key === 'Enter' && execCommand());
+});
+
+// ── Clock ──────────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('sb-time').textContent = new Date().toLocaleTimeString();
+}
+
+// ── Docker Status ──────────────────────────────────────────────────────────────
+async function checkDockerStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    const badge = document.getElementById('docker-badge');
+    const sb = document.getElementById('statusbar');
+    if (d.docker) {
+      badge.textContent = `⬤ Docker v${d.docker_version}`;
+      badge.style.color = '#4caf50';
+      document.getElementById('sb-docker').textContent = `Docker v${d.docker_version}`;
+      document.getElementById('sb-host').textContent = `Host: ${d.host_ip}`;
+      sb.classList.remove('error-bar');
+    } else {
+      badge.textContent = '⬤ Docker offline';
+      badge.style.color = '#f44336';
+      document.getElementById('sb-docker').textContent = 'Docker: OFFLINE';
+      sb.classList.add('error-bar');
+    }
+  } catch(e) {}
+}
+
+// ── Sessions ───────────────────────────────────────────────────────────────────
+async function refreshSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    const d = await r.json();
+    sessions = d.sessions || [];
+    renderSidebar();
+    renderGrid();
+    document.getElementById('sb-sessions').textContent = `Sessions: ${sessions.length}`;
+    // Re-select if previously selected
+    if (selectedSession) {
+      const still = sessions.find(s => s.username === selectedSession.username);
+      if (still) { selectedSession = still; renderRightPanel(); }
+    }
+  } catch(e) {}
+}
+
+function renderSidebar() {
+  const list = document.getElementById('sidebar-list');
+  list.innerHTML = '';
+  sessions.forEach(s => {
+    const el = document.createElement('div');
+    el.className = `session-item${selectedSession?.username === s.username ? ' selected' : ''}`;
+    el.innerHTML = `
+      <div class="si-status ${dotClass(s.status)}"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="si-name">${s.username}</div>
+        <div class="si-port">:${s.port}</div>
+      </div>`;
+    el.onclick = () => selectSession(s);
+    list.appendChild(el);
+  });
+}
+
+function renderGrid() {
+  const grid = document.getElementById('session-grid');
+  grid.innerHTML = '';
+  if (sessions.length === 0) {
+    grid.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🐉</div>
+      <p>No sessions yet.<br>Click <strong>New</strong> in the toolbar to create one.</p>
+    </div>`;
+    return;
+  }
+  sessions.forEach(s => {
+    const card = document.createElement('div');
+    card.className = `machine-card${selectedSession?.username === s.username ? ' selected' : ''}`;
+    card.innerHTML = `
+      <div class="mc-header">
+        <div class="mc-icon">🐉</div>
+        <div class="mc-title">
+          <div class="mc-name">${s.username}</div>
+          <div class="mc-sub">kali-linux • Port ${s.port}</div>
+        </div>
+        <span class="mc-status-badge ${badgeClass(s.status)}">${s.status}</span>
+      </div>
+      <div class="mc-body">
+        <div class="mc-row">
+          <span class="mc-label">URL</span>
+          <span class="mc-val link" onclick="event.stopPropagation(); window.open('${s.url}','_blank')">${s.url}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-label">Password</span>
+          <span class="mc-val">${s.password}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-label">CPU / RAM</span>
+          <span class="mc-val">${s.cpu_limit} cores / ${s.mem_limit}</span>
+        </div>
+        <div class="mc-row">
+          <span class="mc-label">Created</span>
+          <span class="mc-val">${s.created_at}</span>
+        </div>
+      </div>`;
+    card.onclick = () => selectSession(s);
+    card.ondblclick = () => { selectSession(s); actionConnect(); };
+    grid.appendChild(card);
+  });
+}
+
+function selectSession(s) {
+  selectedSession = s;
+  renderSidebar();
+  renderGrid();
+  renderRightPanel();
+  updateToolbar();
+}
+
+function updateToolbar() {
+  const s = selectedSession;
+  const running = s?.status === 'running';
+  const stopped = s?.status === 'stopped' || s?.status === 'exited';
+  const has = !!s;
+  setBtn('btn-start', has && !running);
+  setBtn('btn-stop', running);
+  setBtn('btn-restart', running);
+  setBtn('btn-connect', running);
+  setBtn('btn-terminal', running);
+  setBtn('btn-passwd', running);
+  setBtn('btn-remove', has);
+}
+
+function setBtn(id, enabled) {
+  const el = document.getElementById(id);
+  if (enabled) el.classList.remove('disabled');
+  else el.classList.add('disabled');
+}
+
+// ── Right Panel ────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.rp-tab').forEach((el, i) => {
+    el.classList.toggle('active', ['details','stats','logs'][i] === tab);
+  });
+  clearInterval(statsInterval);
+  clearInterval(logsInterval);
+  if (tab === 'stats') {
+    loadStats();
+    statsInterval = setInterval(loadStats, 4000);
+  } else if (tab === 'logs') {
+    loadLogs();
+    logsInterval = setInterval(loadLogs, 5000);
+  } else {
+    renderRightPanel();
+  }
+}
+
+function renderRightPanel() {
+  if (currentTab === 'details') renderDetails();
+  else if (currentTab === 'stats') loadStats();
+  else loadLogs();
+}
+
+function renderDetails() {
+  const panel = document.getElementById('rp-details');
+  if (!selectedSession) {
+    panel.innerHTML = `<div style="color:var(--text-3); font-size:12px; margin-top:16px; text-align:center;">Select a session to view details</div>`;
+    return;
+  }
+  const s = selectedSession;
+  panel.innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">Session Info</div>
+      <div class="detail-row"><div class="detail-label">Username</div><div class="detail-val">${s.username}</div></div>
+      <div class="detail-row"><div class="detail-label">Status</div><div class="detail-val" style="color:${statusColor(s.status)}">${s.status}</div></div>
+      <div class="detail-row"><div class="detail-label">Password</div><div class="detail-val">${s.password}</div></div>
+      <div class="detail-row"><div class="detail-label">Created</div><div class="detail-val">${s.created_at}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Network</div>
+      <div class="detail-row"><div class="detail-label">Primary URL</div><div class="detail-val clickable" onclick="window.open('${s.url}','_blank')">${s.url}</div></div>
+      <div class="detail-row"><div class="detail-label">Alternate URL</div><div class="detail-val clickable" onclick="window.open('${s.url_alt}','_blank')">${s.url_alt}</div></div>
+      <div class="detail-row"><div class="detail-label">Port</div><div class="detail-val">${s.port}</div></div>
+      <div class="detail-row"><div class="detail-label">Alt Port</div><div class="detail-val">${s.port_alt}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Resources</div>
+      <div class="detail-row"><div class="detail-label">CPU Limit</div><div class="detail-val">${s.cpu_limit} cores</div></div>
+      <div class="detail-row"><div class="detail-label">RAM Limit</div><div class="detail-val">${s.mem_limit}</div></div>
+      <div class="detail-row"><div class="detail-label">Data Dir</div><div class="detail-val" style="font-size:10px;">${s.data_dir}</div></div>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="btn btn-primary" style="width:100%; margin-bottom:6px;" onclick="window.open('${s.url}','_blank')">🖥️ Open Desktop</button>
+    </div>`;
+}
+
+async function loadStats() {
+  const panel = document.getElementById('rp-details');
+  if (!selectedSession || currentTab !== 'stats') return;
+  try {
+    const r = await fetch(`/api/sessions/${selectedSession.username}/stats`);
+    const d = await r.json();
+    if (Object.keys(d).length === 0) {
+      panel.innerHTML = `<div style="color:var(--text-3); font-size:12px; margin-top:16px; text-align:center;">Container not running</div>`;
+      return;
+    }
+    panel.innerHTML = `
+      <div style="margin-bottom:14px;">
+        <div class="gauge-row">
+          <div class="gauge-header">
+            <span class="gauge-label">CPU Usage</span>
+            <span class="gauge-val">${d.cpu}%</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-fill gauge-cpu" style="width:${Math.min(d.cpu,100)}%"></div></div>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-header">
+            <span class="gauge-label">Memory</span>
+            <span class="gauge-val">${d.mem_used} MB / ${d.mem_total} MB (${d.mem_pct}%)</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-fill gauge-mem" style="width:${Math.min(d.mem_pct,100)}%"></div></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">Network I/O</div>
+        <div class="detail-row"><div class="detail-label">Download</div><div class="detail-val">↓ ${d.net_rx} KB</div></div>
+        <div class="detail-row"><div class="detail-label">Upload</div><div class="detail-val">↑ ${d.net_tx} KB</div></div>
+      </div>
+      <div style="font-size:10px; color:var(--text-3); margin-top:8px;">Auto-refreshing every 4s</div>`;
+  } catch(e) {
+    panel.innerHTML = `<div style="color:var(--text-3);">Error loading stats</div>`;
+  }
+}
+
+async function loadLogs() {
+  const panel = document.getElementById('rp-details');
+  if (!selectedSession || currentTab !== 'logs') return;
+  try {
+    const r = await fetch(`/api/sessions/${selectedSession.username}/logs?tail=60`);
+    const d = await r.json();
+    panel.innerHTML = `<div id="log-output">${escapeHtml(d.logs || '')}</div>`;
+    const log = document.getElementById('log-output');
+    if (log) log.scrollTop = log.scrollHeight;
+  } catch(e) {
+    panel.innerHTML = `<div style="color:var(--text-3);">Error loading logs</div>`;
+  }
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────────
+async function actionStart() {
+  if (!selectedSession) return;
+  showToast(`Starting ${selectedSession.username}…`, 'info');
+  const r = await fetch(`/api/sessions/${selectedSession.username}/start`, { method: 'POST' });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 1500);
+}
+
+async function actionStop() {
+  if (!selectedSession) return;
+  showToast(`Stopping ${selectedSession.username}…`, 'info');
+  const r = await fetch(`/api/sessions/${selectedSession.username}/stop`, { method: 'POST' });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 1500);
+}
+
+async function actionRestart() {
+  if (!selectedSession) return;
+  showToast(`Restarting ${selectedSession.username}…`, 'info');
+  const r = await fetch(`/api/sessions/${selectedSession.username}/restart`, { method: 'POST' });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 4000);
+}
+
+function actionConnect() {
+  if (!selectedSession || selectedSession.status !== 'running') return;
+  window.open(selectedSession.url, '_blank');
+}
+
+// ── Create ─────────────────────────────────────────────────────────────────────
+function openCreateModal() {
+  document.getElementById('inp-username').value = '';
+  document.getElementById('inp-password').value = 'kali';
+  openModal('modal-create');
+  setTimeout(() => document.getElementById('inp-username').focus(), 100);
+}
+
+async function createSession() {
+  const username = document.getElementById('inp-username').value.trim();
+  const password = document.getElementById('inp-password').value.trim() || 'kali';
+  if (!username) { showToast('Username is required', 'error'); return; }
+  closeModal('modal-create');
+  showToast(`Creating session '${username}'…`, 'info');
+  const r = await fetch('/api/sessions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, password }),
+  });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 2000);
+}
+
+// ── Bulk ───────────────────────────────────────────────────────────────────────
+function openBulkModal() { openModal('modal-bulk'); }
+
+async function bulkCreate() {
+  const prefix = document.getElementById('inp-bulk-prefix').value.trim() || 'student';
+  const count = parseInt(document.getElementById('inp-bulk-count').value) || 1;
+  const password = document.getElementById('inp-bulk-password').value.trim() || 'kali';
+  closeModal('modal-bulk');
+  showToast(`Creating ${count} sessions with prefix '${prefix}'…`, 'info');
+  const r = await fetch('/api/bulk_create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ prefix, count, password }),
+  });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 3000);
+}
+
+// ── Password ───────────────────────────────────────────────────────────────────
+function openPasswordModal() {
+  if (!selectedSession) return;
+  document.getElementById('pw-username-label').textContent = selectedSession.username;
+  document.getElementById('inp-new-password').value = '';
+  openModal('modal-password');
+  setTimeout(() => document.getElementById('inp-new-password').focus(), 100);
+}
+
+async function changePassword() {
+  const pw = document.getElementById('inp-new-password').value.trim();
+  if (!pw) { showToast('Password is required', 'error'); return; }
+  closeModal('modal-password');
+  const r = await fetch(`/api/sessions/${selectedSession.username}/password`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ password: pw }),
+  });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  setTimeout(refreshSessions, 1000);
+}
+
+// ── Terminal ───────────────────────────────────────────────────────────────────
+function openTerminalModal() {
+  if (!selectedSession) return;
+  document.getElementById('term-username-label').textContent = selectedSession.username;
+  document.getElementById('terminal-output').textContent = `Connected to ${selectedSession.username}\n$ `;
+  document.getElementById('inp-terminal-cmd').value = '';
+  openModal('modal-terminal');
+  setTimeout(() => document.getElementById('inp-terminal-cmd').focus(), 100);
+}
+
+async function execCommand() {
+  const cmd = document.getElementById('inp-terminal-cmd').value.trim();
+  if (!cmd) return;
+  const output = document.getElementById('terminal-output');
+  output.textContent += `\n$ ${cmd}\n`;
+  document.getElementById('inp-terminal-cmd').value = '';
+  const r = await fetch(`/api/sessions/${selectedSession.username}/exec`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ command: cmd }),
+  });
+  const d = await r.json();
+  output.textContent += d.output || d.error || '(no output)';
+  output.textContent += '\n';
+  output.scrollTop = output.scrollHeight;
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+function confirmDelete() {
+  if (!selectedSession) return;
+  document.getElementById('confirm-msg').textContent =
+    `Permanently remove session '${selectedSession.username}'? This cannot be undone.`;
+  openModal('modal-confirm');
+}
+
+async function deleteSession() {
+  closeModal('modal-confirm');
+  const uname = selectedSession.username;
+  showToast(`Removing ${uname}…`, 'info');
+  const r = await fetch(`/api/sessions/${uname}`, { method: 'DELETE' });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+  selectedSession = null;
+  document.getElementById('rp-details').innerHTML = '';
+  updateToolbar();
+  setTimeout(refreshSessions, 1000);
+}
+
+// ── Pull Image ─────────────────────────────────────────────────────────────────
+async function pullImage() {
+  showToast('Pulling Docker image in background…', 'info');
+  const r = await fetch('/api/pull_image', { method: 'POST' });
+  const d = await r.json();
+  showToast(d.message || d.error, r.ok ? 'success' : 'error');
+}
+
+// ── Modal Helpers ──────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => m.classList.add('hidden'));
+});
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+});
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+let toastTimeout;
+function showToast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function dotClass(status) {
+  return {'running':'dot-running','stopped':'dot-stopped','exited':'dot-exited',
+          'paused':'dot-paused','creating':'dot-creating'}[status] || 'dot-missing';
+}
+function badgeClass(status) {
+  return {'running':'status-running','stopped':'status-stopped','exited':'status-stopped',
+          'paused':'status-paused','creating':'status-creating'}[status] || 'status-missing';
+}
+function statusColor(status) {
+  return {'running':'#4caf50','stopped':'#f44336','exited':'#f44336',
+          'paused':'#ffc107','creating':'#ffc107'}[status] || '#757575';
+}
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
